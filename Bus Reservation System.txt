@@ -1,0 +1,1105 @@
+                                                                                                
+
+                                 ====================================================
+                                                Bus Reservation System
+                                 ====================================================
+
+create database bus_reservation;
+
+use bus_reservation;
+
+create table buses (
+    bus_id int primary key,
+    bus_name varchar(50),
+    source varchar(50),
+    destination varchar(50),
+    total_seats int,
+    available_seats int
+);
+
+create table passengers (
+    passenger_id int primary key auto_increment,
+    passenger_name varchar(50),
+    age int,
+    gender varchar(10),
+    phone varchar(15)
+);
+
+create table bookings (
+    booking_id int primary key auto_increment,
+    bus_id int,
+    passenger_id int,
+    seat_number int,
+    booking_date timestamp default current_timestamp,
+    status varchar(20),
+    foreign key (bus_id) references buses(bus_id),
+    foreign key (passenger_id) references passengers(passenger_id)
+);
+
+============================================================
+ 1. DBConnection.java
+============================================================
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+
+public class DBConnection {
+
+    private static final String URL =
+            "jdbc:mysql://localhost:3306/bus_reservation";
+
+    private static final String USER = "root";
+    private static final String PASSWORD = "Supraja@123";
+
+    public static Connection getConnection()
+            throws SQLException {
+
+        return DriverManager.getConnection(
+                URL,
+                USER,
+                PASSWORD
+        );
+    }
+}
+
+
+ ============================================================
+ 2. BusDAO.java
+ ============================================================
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+public class BusDAO {
+
+    public void searchBuses(String source,
+                            String destination) {
+
+        String sql =
+                "select * from buses " +
+                "where source = ? and destination = ?";
+
+        try (Connection con =
+                     DBConnection.getConnection();
+             PreparedStatement ps =
+                     con.prepareStatement(sql)) {
+
+            ps.setString(1, source);
+            ps.setString(2, destination);
+
+            ResultSet rs = ps.executeQuery();
+
+            boolean found = false;
+
+            System.out.println(
+                    "\n========== BUS SEARCH ==========");
+
+            while (rs.next()) {
+
+                found = true;
+
+                System.out.println(
+                        "\nBus ID          : " +
+                        rs.getInt("bus_id"));
+
+                System.out.println(
+                        "Bus Name        : " +
+                        rs.getString("bus_name"));
+
+                System.out.println(
+                        "Source          : " +
+                        rs.getString("source"));
+
+                System.out.println(
+                        "Destination     : " +
+                        rs.getString("destination"));
+
+                System.out.println(
+                        "Total Seats     : " +
+                        rs.getInt("total_seats"));
+
+                System.out.println(
+                        "Available Seats : " +
+                        rs.getInt("available_seats"));
+
+                System.out.println(
+                        "--------------------------------");
+            }
+
+            if (!found) {
+                System.out.println("No buses found.");
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    public void displayAllBuses() {
+
+        String sql = "select * from buses";
+
+        try (Connection con =
+                     DBConnection.getConnection();
+             PreparedStatement ps =
+                     con.prepareStatement(sql)) {
+
+            ResultSet rs = ps.executeQuery();
+
+            boolean found = false;
+
+            System.out.println(
+                    "\n========== AVAILABLE BUSES ==========");
+
+            while (rs.next()) {
+
+                found = true;
+
+                System.out.println(
+                        "\nBus ID          : " +
+                        rs.getInt("bus_id"));
+
+                System.out.println(
+                        "Bus Name        : " +
+                        rs.getString("bus_name"));
+
+                System.out.println(
+                        "Route           : " +
+                        rs.getString("source") +
+                        " -> " +
+                        rs.getString("destination"));
+
+                System.out.println(
+                        "Total Seats     : " +
+                        rs.getInt("total_seats"));
+
+                System.out.println(
+                        "Available Seats : " +
+                        rs.getInt("available_seats"));
+
+                System.out.println(
+                        "--------------------------------------");
+            }
+
+            if (!found) {
+                System.out.println(
+                        "No buses available.");
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    public int getAvailableSeats(Connection con,
+                                 int busId)
+            throws SQLException {
+
+        String sql =
+                "select available_seats " +
+                "from buses " +
+                "where bus_id = ? for update";
+
+        PreparedStatement ps =
+                con.prepareStatement(sql);
+
+        ps.setInt(1, busId);
+
+        ResultSet rs = ps.executeQuery();
+
+        if (rs.next()) {
+            return rs.getInt("available_seats");
+        }
+
+        return -1;
+    }
+
+
+    public int getTotalSeats(Connection con,
+                             int busId)
+            throws SQLException {
+
+        String sql =
+                "select total_seats " +
+                "from buses " +
+                "where bus_id = ?";
+
+        PreparedStatement ps =
+                con.prepareStatement(sql);
+
+        ps.setInt(1, busId);
+
+        ResultSet rs = ps.executeQuery();
+
+        if (rs.next()) {
+            return rs.getInt("total_seats");
+        }
+
+        return -1;
+    }
+
+
+    public void decreaseSeat(Connection con,
+                             int busId)
+            throws SQLException {
+
+        String sql =
+                "update buses " +
+                "set available_seats = " +
+                "available_seats - 1 " +
+                "where bus_id = ?";
+
+        PreparedStatement ps =
+                con.prepareStatement(sql);
+
+        ps.setInt(1, busId);
+
+        ps.executeUpdate();
+    }
+
+
+    public void increaseSeat(Connection con,
+                             int busId)
+            throws SQLException {
+
+        String sql =
+                "update buses " +
+                "set available_seats = " +
+                "available_seats + 1 " +
+                "where bus_id = ?";
+
+        PreparedStatement ps =
+                con.prepareStatement(sql);
+
+        ps.setInt(1, busId);
+
+        ps.executeUpdate();
+    }
+}
+
+
+// ============================================================
+// 3. PassengerDAO.java
+// ============================================================
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+
+public class PassengerDAO {
+
+    public int addPassenger(Connection con,
+                            String name,
+                            int age,
+                            String gender,
+                            String phone)
+            throws SQLException {
+
+        String sql =
+                "insert into passengers " +
+                "(passenger_name, age, gender, phone) " +
+                "values (?, ?, ?, ?)";
+
+        PreparedStatement ps =
+                con.prepareStatement(
+                        sql,
+                        Statement.RETURN_GENERATED_KEYS);
+
+        ps.setString(1, name);
+        ps.setInt(2, age);
+        ps.setString(3, gender);
+        ps.setString(4, phone);
+
+        ps.executeUpdate();
+
+        ResultSet rs =
+                ps.getGeneratedKeys();
+
+        if (rs.next()) {
+            return rs.getInt(1);
+        }
+
+        return -1;
+    }
+
+
+    public void viewPassenger(int passengerId) {
+
+        String sql =
+                "select * from passengers " +
+                "where passenger_id = ?";
+
+        try (Connection con =
+                     DBConnection.getConnection();
+             PreparedStatement ps =
+                     con.prepareStatement(sql)) {
+
+            ps.setInt(1, passengerId);
+
+            ResultSet rs =
+                    ps.executeQuery();
+
+            if (rs.next()) {
+
+                System.out.println(
+                        "\n===== PASSENGER DETAILS =====");
+
+                System.out.println(
+                        "Passenger ID : " +
+                        rs.getInt("passenger_id"));
+
+                System.out.println(
+                        "Name : " +
+                        rs.getString("passenger_name"));
+
+                System.out.println(
+                        "Age : " +
+                        rs.getInt("age"));
+
+                System.out.println(
+                        "Gender : " +
+                        rs.getString("gender"));
+
+                System.out.println(
+                        "Phone : " +
+                        rs.getString("phone"));
+
+            } else {
+
+                System.out.println(
+                        "Passenger not found.");
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+
+// ============================================================
+// 4. BookingDAO.java
+// ============================================================
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+
+public class BookingDAO {
+
+    public boolean isSeatBooked(Connection con,
+                                int busId,
+                                int seatNumber)
+            throws SQLException {
+
+        String sql =
+                "select booking_id " +
+                "from bookings " +
+                "where bus_id = ? " +
+                "and seat_number = ? " +
+                "and status = 'CONFIRMED'";
+
+        PreparedStatement ps =
+                con.prepareStatement(sql);
+
+        ps.setInt(1, busId);
+        ps.setInt(2, seatNumber);
+
+        ResultSet rs =
+                ps.executeQuery();
+
+        return rs.next();
+    }
+
+
+    public int createBooking(Connection con,
+                             int busId,
+                             int passengerId,
+                             int seatNumber)
+            throws SQLException {
+
+        String sql =
+                "insert into bookings " +
+                "(bus_id, passenger_id, " +
+                "seat_number, status) " +
+                "values (?, ?, ?, 'CONFIRMED')";
+
+        PreparedStatement ps =
+                con.prepareStatement(
+                        sql,
+                        Statement.RETURN_GENERATED_KEYS);
+
+        ps.setInt(1, busId);
+        ps.setInt(2, passengerId);
+        ps.setInt(3, seatNumber);
+
+        ps.executeUpdate();
+
+        ResultSet rs =
+                ps.getGeneratedKeys();
+
+        if (rs.next()) {
+            return rs.getInt(1);
+        }
+
+        return -1;
+    }
+
+
+    public ResultSet getBooking(Connection con,
+                                int bookingId)
+            throws SQLException {
+
+        String sql =
+                "select * from bookings " +
+                "where booking_id = ?";
+
+        PreparedStatement ps =
+                con.prepareStatement(sql);
+
+        ps.setInt(1, bookingId);
+
+        return ps.executeQuery();
+    }
+
+
+    public void cancelBooking(Connection con,
+                              int bookingId)
+            throws SQLException {
+
+        String sql =
+                "update bookings " +
+                "set status = 'CANCELLED' " +
+                "where booking_id = ?";
+
+        PreparedStatement ps =
+                con.prepareStatement(sql);
+
+        ps.setInt(1, bookingId);
+
+        ps.executeUpdate();
+    }
+
+
+    public void viewTicket(int bookingId) {
+
+        String sql =
+                "select b.booking_id, " +
+                "b.seat_number, b.status, " +
+                "p.passenger_name, p.phone, " +
+                "bus.bus_name, bus.source, " +
+                "bus.destination " +
+                "from bookings b " +
+                "join passengers p " +
+                "on b.passenger_id = p.passenger_id " +
+                "join buses bus " +
+                "on b.bus_id = bus.bus_id " +
+                "where b.booking_id = ?";
+
+        try (Connection con =
+                     DBConnection.getConnection();
+             PreparedStatement ps =
+                     con.prepareStatement(sql)) {
+
+            ps.setInt(1, bookingId);
+
+            ResultSet rs =
+                    ps.executeQuery();
+
+            if (rs.next()) {
+
+                System.out.println(
+                        "\n========== TICKET ==========");
+
+                System.out.println(
+                        "Booking ID : " +
+                        rs.getInt("booking_id"));
+
+                System.out.println(
+                        "Passenger : " +
+                        rs.getString("passenger_name"));
+
+                System.out.println(
+                        "Phone : " +
+                        rs.getString("phone"));
+
+                System.out.println(
+                        "Bus : " +
+                        rs.getString("bus_name"));
+
+                System.out.println(
+                        "Route : " +
+                        rs.getString("source") +
+                        " -> " +
+                        rs.getString("destination"));
+
+                System.out.println(
+                        "Seat Number : " +
+                        rs.getInt("seat_number"));
+
+                System.out.println(
+                        "Status : " +
+                        rs.getString("status"));
+
+                System.out.println(
+                        "============================");
+
+            } else {
+
+                System.out.println(
+                        "Ticket not found.");
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+
+// ============================================================
+// 5. BookingService.java
+// ============================================================
+
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+public class BookingService {
+
+    private BusDAO busDAO =
+            new BusDAO();
+
+    private PassengerDAO passengerDAO =
+            new PassengerDAO();
+
+    private BookingDAO bookingDAO =
+            new BookingDAO();
+
+
+    public void bookTicket(int busId,
+                           int seatNumber,
+                           String name,
+                           int age,
+                           String gender,
+                           String phone) {
+
+        Connection con = null;
+
+        try {
+
+            con = DBConnection.getConnection();
+
+            con.setAutoCommit(false);
+
+
+            int availableSeats =
+                    busDAO.getAvailableSeats(
+                            con,
+                            busId);
+
+
+            if (availableSeats == -1) {
+
+                System.out.println(
+                        "Bus not found.");
+
+                con.rollback();
+
+                return;
+            }
+
+
+            int totalSeats =
+                    busDAO.getTotalSeats(
+                            con,
+                            busId);
+
+
+            System.out.println(
+                    "\nTotal Seats     : " +
+                    totalSeats);
+
+            System.out.println(
+                    "Available Seats : " +
+                    availableSeats);
+
+
+            if (availableSeats <= 0) {
+
+                System.out.println(
+                        "No seats available.");
+
+                con.rollback();
+
+                return;
+            }
+
+
+            if (seatNumber < 1 ||
+                seatNumber > totalSeats) {
+
+                System.out.println(
+                        "Invalid seat number.");
+
+                System.out.println(
+                        "Please enter seat number " +
+                        "between 1 and " +
+                        totalSeats);
+
+                con.rollback();
+
+                return;
+            }
+
+
+            boolean booked =
+                    bookingDAO.isSeatBooked(
+                            con,
+                            busId,
+                            seatNumber);
+
+
+            if (booked) {
+
+                System.out.println(
+                        "Seat " +
+                        seatNumber +
+                        " is already booked.");
+
+                con.rollback();
+
+                return;
+            }
+
+
+            int passengerId =
+                    passengerDAO.addPassenger(
+                            con,
+                            name,
+                            age,
+                            gender,
+                            phone);
+
+
+            int bookingId =
+                    bookingDAO.createBooking(
+                            con,
+                            busId,
+                            passengerId,
+                            seatNumber);
+
+
+            busDAO.decreaseSeat(
+                    con,
+                    busId);
+
+
+            con.commit();
+
+
+            System.out.println(
+                    "\n================================");
+
+            System.out.println(
+                    "       BOOKING SUCCESSFUL");
+
+            System.out.println(
+                    "================================");
+
+            System.out.println(
+                    "Booking ID : " +
+                    bookingId);
+
+            System.out.println(
+                    "Passenger ID : " +
+                    passengerId);
+
+            System.out.println(
+                    "Bus ID : " +
+                    busId);
+
+            System.out.println(
+                    "Seat Number : " +
+                    seatNumber);
+
+            System.out.println(
+                    "Status : CONFIRMED");
+
+            System.out.println(
+                    "================================");
+
+
+        } catch (SQLException e) {
+
+            try {
+
+                if (con != null) {
+                    con.rollback();
+                }
+
+            } catch (SQLException ex) {
+                ex.printStackTrace();
+            }
+
+            System.out.println(
+                    "Booking failed.");
+
+            e.printStackTrace();
+
+
+        } finally {
+
+            try {
+
+                if (con != null) {
+                    con.close();
+                }
+
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+
+    public void cancelTicket(int bookingId) {
+
+        Connection con = null;
+
+        try {
+
+            con = DBConnection.getConnection();
+
+            con.setAutoCommit(false);
+
+
+            ResultSet rs =
+                    bookingDAO.getBooking(
+                            con,
+                            bookingId);
+
+
+            if (!rs.next()) {
+
+                System.out.println(
+                        "Booking not found.");
+
+                con.rollback();
+
+                return;
+            }
+
+
+            int busId =
+                    rs.getInt("bus_id");
+
+
+            int seatNumber =
+                    rs.getInt("seat_number");
+
+
+            String status =
+                    rs.getString("status");
+
+
+            if (status.equals("CANCELLED")) {
+
+                System.out.println(
+                        "Ticket already cancelled.");
+
+                con.rollback();
+
+                return;
+            }
+
+
+            bookingDAO.cancelBooking(
+                    con,
+                    bookingId);
+
+
+            busDAO.increaseSeat(
+                    con,
+                    busId);
+
+
+            con.commit();
+
+
+            System.out.println(
+                    "\nTicket cancelled successfully.");
+
+            System.out.println(
+                    "Seat " +
+                    seatNumber +
+                    " is now available.");
+
+
+        } catch (SQLException e) {
+
+            try {
+
+                if (con != null) {
+                    con.rollback();
+                }
+
+            } catch (SQLException ex) {
+                ex.printStackTrace();
+            }
+
+            System.out.println(
+                    "Cancellation failed.");
+
+            e.printStackTrace();
+
+
+        } finally {
+
+            try {
+
+                if (con != null) {
+                    con.close();
+                }
+
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+
+
+// ============================================================
+// 6. Main.java
+// ============================================================
+
+import java.util.Scanner;
+
+public class Main {
+
+    public static void main(String[] args) {
+
+        Scanner sc =
+                new Scanner(System.in);
+
+        BusDAO busDAO =
+                new BusDAO();
+
+        BookingService bookingService =
+                new BookingService();
+
+        PassengerDAO passengerDAO =
+                new PassengerDAO();
+
+        BookingDAO bookingDAO =
+                new BookingDAO();
+
+
+        while (true) {
+
+            System.out.println(
+                    "\n====================================");
+
+            System.out.println(
+                    "       BUS RESERVATION SYSTEM");
+
+            System.out.println(
+                    "====================================");
+
+            System.out.println(
+                    "1. Search Buses");
+
+            System.out.println(
+                    "2. Seat Booking");
+
+            System.out.println(
+                    "3. Ticket Cancellation");
+
+            System.out.println(
+                    "4. Passenger Details");
+
+            System.out.println(
+                    "5. View Ticket");
+
+            System.out.println(
+                    "6. Exit");
+
+            System.out.println(
+                    "====================================");
+
+
+            System.out.print(
+                    "Enter your choice: ");
+
+            int choice =
+                    Integer.parseInt(
+                            sc.nextLine());
+
+
+            switch (choice) {
+
+
+                case 1:
+
+                    System.out.print(
+                            "Enter Source: ");
+
+                    String source =
+                            sc.nextLine();
+
+
+                    System.out.print(
+                            "Enter Destination: ");
+
+                    String destination =
+                            sc.nextLine();
+
+
+                    busDAO.searchBuses(
+                            source,
+                            destination);
+
+                    break;
+
+
+                case 2:
+
+                    System.out.println(
+                            "\n========== SELECT BUS ==========");
+
+                    busDAO.displayAllBuses();
+
+
+                    System.out.print(
+                            "\nEnter Bus ID: ");
+
+                    int busId =
+                            Integer.parseInt(
+                                    sc.nextLine());
+
+
+                    System.out.print(
+                            "Enter Seat Number: ");
+
+                    int seatNumber =
+                            Integer.parseInt(
+                                    sc.nextLine());
+
+
+                    System.out.print(
+                            "Enter Passenger Name: ");
+
+                    String name =
+                            sc.nextLine();
+
+
+                    System.out.print(
+                            "Enter Age: ");
+
+                    int age =
+                            Integer.parseInt(
+                                    sc.nextLine());
+
+
+                    System.out.print(
+                            "Enter Gender: ");
+
+                    String gender =
+                            sc.nextLine();
+
+
+                    System.out.print(
+                            "Enter Phone: ");
+
+                    String phone =
+                            sc.nextLine();
+
+
+                    bookingService.bookTicket(
+                            busId,
+                            seatNumber,
+                            name,
+                            age,
+                            gender,
+                            phone);
+
+                    break;
+
+
+                case 3:
+
+                    System.out.print(
+                            "Enter Booking ID: ");
+
+                    int bookingId =
+                            Integer.parseInt(
+                                    sc.nextLine());
+
+
+                    bookingService.cancelTicket(
+                            bookingId);
+
+                    break;
+
+
+                case 4:
+
+                    System.out.print(
+                            "Enter Passenger ID: ");
+
+                    int passengerId =
+                            Integer.parseInt(
+                                    sc.nextLine());
+
+
+                    passengerDAO.viewPassenger(
+                            passengerId);
+
+                    break;
+
+
+                case 5:
+
+                    System.out.print(
+                            "Enter Booking ID: ");
+
+                    int ticketId =
+                            Integer.parseInt(
+                                    sc.nextLine());
+
+
+                    bookingDAO.viewTicket(
+                            ticketId);
+
+                    break;
+
+
+                case 6:
+
+                    System.out.println(
+                            "Thank you for using " +
+                            "Bus Reservation System!");
+
+                    sc.close();
+
+                    return;
+
+
+                default:
+
+                    System.out.println(
+                            "Invalid choice.");
+            }
+        }
+    }
+}

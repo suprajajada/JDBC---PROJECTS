@@ -1,0 +1,567 @@
+                                                                                                
+                                 ====================================================
+                                               Banking Management System
+                                 ====================================================
+
+CREATE DATABASE banking_db;
+
+USE banking_db;
+
+CREATE TABLE customers (
+    customer_id INT PRIMARY KEY AUTO_INCREMENT,
+    customer_name VARCHAR(50) NOT NULL,
+    phone VARCHAR(15) UNIQUE,
+    city VARCHAR(30)
+);
+
+CREATE TABLE accounts (
+    account_id INT PRIMARY KEY AUTO_INCREMENT,
+    customer_id INT,
+    account_type VARCHAR(20),
+    balance DECIMAL(12,2) DEFAULT 0,
+    FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
+);
+
+CREATE TABLE transactions (
+    transaction_id INT PRIMARY KEY AUTO_INCREMENT,
+    account_id INT,
+    transaction_type VARCHAR(30),
+    amount DECIMAL(12,2),
+    transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    description VARCHAR(100),
+    FOREIGN KEY (account_id) REFERENCES accounts(account_id)
+);
+
+
+package jdbc;
+
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Scanner;
+
+public class BankingManagementSystem {
+
+    static final String URL = "jdbc:mysql://localhost:3306/banking_db";
+    static final String USER = "root";
+    static final String PASSWORD = "Supraja@123";
+
+    static Scanner sc = new Scanner(System.in);
+
+    public static void main(String[] args) {
+
+        while (true) {
+
+            System.out.println();
+            System.out.println("======================================");
+            System.out.println("     BANKING MANAGEMENT SYSTEM");
+            System.out.println("======================================");
+            System.out.println("1. Create Customer");
+            System.out.println("2. Create Account");
+            System.out.println("3. Deposit");
+            System.out.println("4. Withdraw");
+            System.out.println("5. Fund Transfer");
+            System.out.println("6. Transaction History");
+            System.out.println("7. Exit");
+            System.out.println("======================================");
+
+            System.out.print("Enter your choice: ");
+            int choice = sc.nextInt();
+
+            switch (choice) {
+
+                case 1:
+                    createCustomer();
+                    break;
+
+                case 2:
+                    createAccount();
+                    break;
+
+                case 3:
+                    deposit();
+                    break;
+
+                case 4:
+                    withdraw();
+                    break;
+
+                case 5:
+                    transfer();
+                    break;
+
+                case 6:
+                    transactionHistory();
+                    break;
+
+                case 7:
+                    System.out.println("Thank you for using Banking Management System.");
+                    sc.close();
+                    System.exit(0);
+                    break;
+
+                default:
+                    System.out.println("Invalid choice.");
+            }
+        }
+    }
+
+    // ================= CREATE CUSTOMER =================
+
+    public static void createCustomer() {
+
+        sc.nextLine();
+
+        System.out.print("Enter customer name: ");
+        String name = sc.nextLine();
+
+        System.out.print("Enter phone number: ");
+        String phone = sc.nextLine();
+
+        System.out.print("Enter city: ");
+        String city = sc.nextLine();
+
+        String sql = "INSERT INTO customers(customer_name, phone, city) VALUES (?, ?, ?)";
+
+        try (Connection con = DriverManager.getConnection(URL, USER, PASSWORD);
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setString(1, name);
+            ps.setString(2, phone);
+            ps.setString(3, city);
+
+            int rows = ps.executeUpdate();
+
+            if (rows > 0) {
+                System.out.println("Customer created successfully.");
+            }
+
+        } catch (SQLException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+
+    // ================= CREATE ACCOUNT =================
+
+    public static void createAccount() {
+
+        System.out.print("Enter customer ID: ");
+        int customerId = sc.nextInt();
+
+        System.out.print("Enter account type (Savings/Current): ");
+        String accountType = sc.next();
+
+        System.out.print("Enter initial deposit: ");
+        double balance = sc.nextDouble();
+
+        if (balance < 0) {
+            System.out.println("Balance cannot be negative.");
+            return;
+        }
+
+        String checkCustomer =
+                "SELECT customer_id FROM customers WHERE customer_id = ?";
+
+        String insertAccount =
+                "INSERT INTO accounts(customer_id, account_type, balance) VALUES (?, ?, ?)";
+
+        try (Connection con = DriverManager.getConnection(URL, USER, PASSWORD)) {
+
+            try (PreparedStatement ps = con.prepareStatement(checkCustomer)) {
+
+                ps.setInt(1, customerId);
+
+                ResultSet rs = ps.executeQuery();
+
+                if (!rs.next()) {
+                    System.out.println("Customer not found.");
+                    return;
+                }
+            }
+
+            try (PreparedStatement ps = con.prepareStatement(insertAccount)) {
+
+                ps.setInt(1, customerId);
+                ps.setString(2, accountType);
+                ps.setDouble(3, balance);
+
+                int rows = ps.executeUpdate();
+
+                if (rows > 0) {
+                    System.out.println("Account created successfully.");
+                }
+            }
+
+        } catch (SQLException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+
+    // ================= DEPOSIT =================
+
+    public static void deposit() {
+
+        System.out.print("Enter account ID: ");
+        int accountId = sc.nextInt();
+
+        System.out.print("Enter deposit amount: ");
+        double amount = sc.nextDouble();
+
+        if (amount <= 0) {
+            System.out.println("Amount must be greater than zero.");
+            return;
+        }
+
+        String update =
+                "UPDATE accounts SET balance = balance + ? WHERE account_id = ?";
+
+        String transaction =
+                "INSERT INTO transactions(account_id, transaction_type, amount, description) " +
+                "VALUES (?, ?, ?, ?)";
+
+        try (Connection con = DriverManager.getConnection(URL, USER, PASSWORD)) {
+
+            con.setAutoCommit(false);
+
+            try {
+
+                try (PreparedStatement ps = con.prepareStatement(update)) {
+
+                    ps.setDouble(1, amount);
+                    ps.setInt(2, accountId);
+
+                    int rows = ps.executeUpdate();
+
+                    if (rows == 0) {
+                        throw new SQLException("Account not found.");
+                    }
+                }
+
+                try (PreparedStatement ps = con.prepareStatement(transaction)) {
+
+                    ps.setInt(1, accountId);
+                    ps.setString(2, "DEPOSIT");
+                    ps.setDouble(3, amount);
+                    ps.setString(4, "Money deposited");
+
+                    ps.executeUpdate();
+                }
+
+                con.commit();
+
+                System.out.println("Deposit successful.");
+                System.out.println("Amount deposited: " + amount);
+
+            } catch (Exception e) {
+
+                con.rollback();
+
+                System.out.println("Deposit failed.");
+                System.out.println("Transaction rolled back.");
+                System.out.println("Reason: " + e.getMessage());
+            }
+
+        } catch (SQLException e) {
+            System.out.println("Database error: " + e.getMessage());
+        }
+    }
+
+    // ================= WITHDRAW =================
+
+    public static void withdraw() {
+
+        System.out.print("Enter account ID: ");
+        int accountId = sc.nextInt();
+
+        System.out.print("Enter withdrawal amount: ");
+        double amount = sc.nextDouble();
+
+        if (amount <= 0) {
+            System.out.println("Amount must be greater than zero.");
+            return;
+        }
+
+        String balanceQuery =
+                "SELECT balance FROM accounts WHERE account_id = ?";
+
+        String update =
+                "UPDATE accounts SET balance = balance - ? WHERE account_id = ?";
+
+        String transaction =
+                "INSERT INTO transactions(account_id, transaction_type, amount, description) " +
+                "VALUES (?, ?, ?, ?)";
+
+        try (Connection con = DriverManager.getConnection(URL, USER, PASSWORD)) {
+
+            con.setAutoCommit(false);
+
+            try {
+
+                double balance;
+
+                try (PreparedStatement ps = con.prepareStatement(balanceQuery)) {
+
+                    ps.setInt(1, accountId);
+
+                    ResultSet rs = ps.executeQuery();
+
+                    if (!rs.next()) {
+                        throw new SQLException("Account not found.");
+                    }
+
+                    balance = rs.getDouble("balance");
+                }
+
+                if (balance < amount) {
+                    throw new SQLException("Insufficient balance.");
+                }
+
+                try (PreparedStatement ps = con.prepareStatement(update)) {
+
+                    ps.setDouble(1, amount);
+                    ps.setInt(2, accountId);
+
+                    ps.executeUpdate();
+                }
+
+                try (PreparedStatement ps = con.prepareStatement(transaction)) {
+
+                    ps.setInt(1, accountId);
+                    ps.setString(2, "WITHDRAW");
+                    ps.setDouble(3, amount);
+                    ps.setString(4, "Money withdrawn");
+
+                    ps.executeUpdate();
+                }
+
+                con.commit();
+
+                System.out.println("Withdrawal successful.");
+                System.out.println("Amount withdrawn: " + amount);
+
+            } catch (Exception e) {
+
+                con.rollback();
+
+                System.out.println("Withdrawal failed.");
+                System.out.println("Transaction rolled back.");
+                System.out.println("Reason: " + e.getMessage());
+            }
+
+        } catch (SQLException e) {
+            System.out.println("Database error: " + e.getMessage());
+        }
+    }
+
+    // ================= FUND TRANSFER =================
+
+    public static void transfer() {
+
+        System.out.print("Enter sender account ID: ");
+        int sender = sc.nextInt();
+
+        System.out.print("Enter receiver account ID: ");
+        int receiver = sc.nextInt();
+
+        System.out.print("Enter transfer amount: ");
+        double amount = sc.nextDouble();
+
+        if (amount <= 0) {
+            System.out.println("Amount must be greater than zero.");
+            return;
+        }
+
+        if (sender == receiver) {
+            System.out.println("Sender and receiver cannot be the same.");
+            return;
+        }
+
+        String balanceQuery =
+                "SELECT balance FROM accounts WHERE account_id = ?";
+
+        String deduct =
+                "UPDATE accounts SET balance = balance - ? WHERE account_id = ?";
+
+        String add =
+                "UPDATE accounts SET balance = balance + ? WHERE account_id = ?";
+
+        String transaction =
+                "INSERT INTO transactions(account_id, transaction_type, amount, description) " +
+                "VALUES (?, ?, ?, ?)";
+
+        try (Connection con = DriverManager.getConnection(URL, USER, PASSWORD)) {
+
+            con.setAutoCommit(false);
+
+            try {
+
+                double balance;
+
+                // Check sender balance
+                try (PreparedStatement ps = con.prepareStatement(balanceQuery)) {
+
+                    ps.setInt(1, sender);
+
+                    ResultSet rs = ps.executeQuery();
+
+                    if (!rs.next()) {
+                        throw new SQLException("Sender account not found.");
+                    }
+
+                    balance = rs.getDouble("balance");
+                }
+
+                if (balance < amount) {
+                    throw new SQLException("Insufficient balance.");
+                }
+
+                // Check receiver account
+                try (PreparedStatement ps = con.prepareStatement(balanceQuery)) {
+
+                    ps.setInt(1, receiver);
+
+                    ResultSet rs = ps.executeQuery();
+
+                    if (!rs.next()) {
+                        throw new SQLException("Receiver account not found.");
+                    }
+                }
+
+                // Deduct from sender
+                try (PreparedStatement ps = con.prepareStatement(deduct)) {
+
+                    ps.setDouble(1, amount);
+                    ps.setInt(2, sender);
+
+                    int rows = ps.executeUpdate();
+
+                    if (rows == 0) {
+                        throw new SQLException("Money deduction failed.");
+                    }
+                }
+
+                // Add to receiver
+                try (PreparedStatement ps = con.prepareStatement(add)) {
+
+                    ps.setDouble(1, amount);
+                    ps.setInt(2, receiver);
+
+                    int rows = ps.executeUpdate();
+
+                    if (rows == 0) {
+                        throw new SQLException("Money credit failed.");
+                    }
+                }
+
+                // Sender transaction history
+                try (PreparedStatement ps = con.prepareStatement(transaction)) {
+
+                    ps.setInt(1, sender);
+                    ps.setString(2, "TRANSFER_DEBIT");
+                    ps.setDouble(3, amount);
+                    ps.setString(4, "Transferred to account " + receiver);
+
+                    ps.executeUpdate();
+                }
+
+                // Receiver transaction history
+                try (PreparedStatement ps = con.prepareStatement(transaction)) {
+
+                    ps.setInt(1, receiver);
+                    ps.setString(2, "TRANSFER_CREDIT");
+                    ps.setDouble(3, amount);
+                    ps.setString(4, "Received from account " + sender);
+
+                    ps.executeUpdate();
+                }
+
+                // Everything successful
+                con.commit();
+
+                System.out.println();
+                System.out.println("================================");
+                System.out.println("Fund transfer successful.");
+                System.out.println("Amount transferred: " + amount);
+                System.out.println("From account: " + sender);
+                System.out.println("To account: " + receiver);
+                System.out.println("================================");
+
+            } catch (Exception e) {
+
+                // If anything fails, undo everything
+                con.rollback();
+
+                System.out.println();
+                System.out.println("Fund transfer failed.");
+                System.out.println("Transaction rolled back.");
+                System.out.println("No money was deducted.");
+                System.out.println("Reason: " + e.getMessage());
+            }
+
+        } catch (SQLException e) {
+            System.out.println("Database error: " + e.getMessage());
+        }
+    }
+
+    // ================= TRANSACTION HISTORY =================
+
+    public static void transactionHistory() {
+
+        System.out.print("Enter account ID: ");
+        int accountId = sc.nextInt();
+
+        String sql =
+                "SELECT transaction_id, transaction_type, amount, " +
+                "transaction_date, description " +
+                "FROM transactions " +
+                "WHERE account_id = ? " +
+                "ORDER BY transaction_date DESC";
+
+        try (Connection con = DriverManager.getConnection(URL, USER, PASSWORD);
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, accountId);
+
+            ResultSet rs = ps.executeQuery();
+
+            boolean found = false;
+
+            System.out.println();
+            System.out.println("==============================================");
+            System.out.println("          TRANSACTION HISTORY");
+            System.out.println("==============================================");
+
+            while (rs.next()) {
+
+                found = true;
+
+                System.out.println("Transaction ID : "
+                        + rs.getInt("transaction_id"));
+
+                System.out.println("Type           : "
+                        + rs.getString("transaction_type"));
+
+                System.out.println("Amount         : "
+                        + rs.getDouble("amount"));
+
+                System.out.println("Date           : "
+                        + rs.getTimestamp("transaction_date"));
+
+                System.out.println("Description    : "
+                        + rs.getString("description"));
+
+                System.out.println("----------------------------------------------");
+            }
+
+            if (!found) {
+                System.out.println("No transactions found.");
+            }
+
+        } catch (SQLException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+}

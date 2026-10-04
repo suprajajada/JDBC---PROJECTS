@@ -1,0 +1,620 @@
+                                 ====================================================
+                                                  HOTEL ROOM BOOKING SYSTEM
+                                 ====================================================
+
+
+create database hotel_db;
+
+use hotel_db;
+
+create table rooms (
+    room_id int primary key,
+    room_type varchar(30),
+    price_per_day decimal(10,2),
+    status varchar(20)
+);
+
+create table customers (
+    customer_id int primary key auto_increment,
+    customer_name varchar(50),
+    phone varchar(15),
+    email varchar(50)
+);
+
+create table bookings (
+    booking_id int primary key auto_increment,
+    customer_id int,
+    room_id int,
+    check_in_date date,
+    check_out_date date,
+    total_amount decimal(10,2),
+    status varchar(20),
+    foreign key (customer_id) references customers(customer_id),
+    foreign key (room_id) references rooms(room_id)
+);
+
+
+package jdbc;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Date;
+import java.util.Scanner;
+
+public class HotelRoomBookingSystem {
+
+    static final String URL = "jdbc:mysql://localhost:3306/hotel_db";
+    static final String USER = "root";
+    static final String PASSWORD = "Supraja@123";
+
+    static Scanner sc = new Scanner(System.in);
+
+    public static void main(String[] args) {
+
+        while (true) {
+
+            System.out.println();
+            System.out.println("========================================");
+            System.out.println("       HOTEL ROOM BOOKING SYSTEM");
+            System.out.println("========================================");
+            System.out.println("1. Add Room");
+            System.out.println("2. Add Customer");
+            System.out.println("3. Room Availability");
+            System.out.println("4. Booking");
+            System.out.println("5. Check-In");
+            System.out.println("6. Check-Out");
+            System.out.println("7. Billing");
+            System.out.println("8. Exit");
+            System.out.println("========================================");
+
+            System.out.print("Enter your choice: ");
+            int choice = sc.nextInt();
+
+            switch (choice) {
+
+                case 1:
+                    addRoom();
+                    break;
+
+                case 2:
+                    addCustomer();
+                    break;
+
+                case 3:
+                    roomAvailability();
+                    break;
+
+                case 4:
+                    booking();
+                    break;
+
+                case 5:
+                    checkIn();
+                    break;
+
+                case 6:
+                    checkOut();
+                    break;
+
+                case 7:
+                    billing();
+                    break;
+
+                case 8:
+                    System.out.println("Thank you for using Hotel Room Booking System.");
+                    sc.close();
+                    System.exit(0);
+                    break;
+
+                default:
+                    System.out.println("Invalid choice.");
+            }
+        }
+    }
+
+    // =====================================================
+    // ADD ROOM
+    // =====================================================
+
+    public static void addRoom() {
+
+        System.out.print("Enter room ID: ");
+        int roomId = sc.nextInt();
+
+        sc.nextLine();
+
+        System.out.print("Enter room type: ");
+        String roomType = sc.nextLine();
+
+        System.out.print("Enter price per day: ");
+        double price = sc.nextDouble();
+
+        String sql =
+                "insert into rooms(room_id, room_type, price_per_day, status) " +
+                "values (?, ?, ?, ?)";
+
+        try (Connection con =
+                     DriverManager.getConnection(URL, USER, PASSWORD);
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, roomId);
+            ps.setString(2, roomType);
+            ps.setDouble(3, price);
+            ps.setString(4, "Available");
+
+            int rows = ps.executeUpdate();
+
+            if (rows > 0) {
+                System.out.println("Room added successfully.");
+            }
+
+        } catch (SQLException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+
+    // =====================================================
+    // ADD CUSTOMER
+    // =====================================================
+
+    public static void addCustomer() {
+
+        sc.nextLine();
+
+        System.out.print("Enter customer name: ");
+        String name = sc.nextLine();
+
+        System.out.print("Enter phone number: ");
+        String phone = sc.nextLine();
+
+        System.out.print("Enter email: ");
+        String email = sc.nextLine();
+
+        String sql =
+                "insert into customers(customer_name, phone, email) " +
+                "values (?, ?, ?)";
+
+        try (Connection con =
+                     DriverManager.getConnection(URL, USER, PASSWORD);
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setString(1, name);
+            ps.setString(2, phone);
+            ps.setString(3, email);
+
+            int rows = ps.executeUpdate();
+
+            if (rows > 0) {
+                System.out.println("Customer added successfully.");
+            }
+
+        } catch (SQLException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+
+    // =====================================================
+    // ROOM AVAILABILITY
+    // =====================================================
+
+    public static void roomAvailability() {
+
+        String sql =
+                "select room_id, room_type, price_per_day, status " +
+                "from rooms";
+
+        try (Connection con =
+                     DriverManager.getConnection(URL, USER, PASSWORD);
+             PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+
+            System.out.println();
+            System.out.println("================================================");
+            System.out.println("              ROOM DETAILS");
+            System.out.println("================================================");
+
+            boolean found = false;
+
+            while (rs.next()) {
+
+                found = true;
+
+                System.out.println("Room ID       : "
+                        + rs.getInt("room_id"));
+
+                System.out.println("Room Type     : "
+                        + rs.getString("room_type"));
+
+                System.out.println("Price Per Day : "
+                        + rs.getDouble("price_per_day"));
+
+                System.out.println("Status        : "
+                        + rs.getString("status"));
+
+                System.out.println("-----------------------------------------------");
+            }
+
+            if (!found) {
+                System.out.println("No rooms found.");
+            }
+
+        } catch (SQLException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+
+    // =====================================================
+    // BOOKING
+    // =====================================================
+
+    public static void booking() {
+
+        System.out.print("Enter customer ID: ");
+        int customerId = sc.nextInt();
+
+        System.out.print("Enter room ID: ");
+        int roomId = sc.nextInt();
+
+        sc.nextLine();
+
+        System.out.print("Enter check-in date (yyyy-mm-dd): ");
+        String checkInInput = sc.nextLine();
+
+        System.out.print("Enter check-out date (yyyy-mm-dd): ");
+        String checkOutInput = sc.nextLine();
+
+        Date checkIn;
+        Date checkOut;
+
+        try {
+
+            checkIn = Date.valueOf(checkInInput);
+            checkOut = Date.valueOf(checkOutInput);
+
+        } catch (IllegalArgumentException e) {
+
+            System.out.println("Invalid date format.");
+            System.out.println("Use yyyy-mm-dd");
+            return;
+        }
+
+        if (!checkOut.after(checkIn)) {
+            System.out.println("Check-out date must be after check-in date.");
+            return;
+        }
+
+        String customerQuery =
+                "select customer_id from customers where customer_id = ?";
+
+        String roomQuery =
+                "select price_per_day, status from rooms where room_id = ?";
+
+        String insertBooking =
+                "insert into bookings(customer_id, room_id, check_in_date, " +
+                "check_out_date, total_amount, status) " +
+                "values (?, ?, ?, ?, ?, ?)";
+
+        String updateRoom =
+                "update rooms set status = 'Booked' where room_id = ?";
+
+        try (Connection con =
+                     DriverManager.getConnection(URL, USER, PASSWORD)) {
+
+            con.setAutoCommit(false);
+
+            try {
+
+                // Check customer
+                try (PreparedStatement ps =
+                             con.prepareStatement(customerQuery)) {
+
+                    ps.setInt(1, customerId);
+
+                    ResultSet rs = ps.executeQuery();
+
+                    if (!rs.next()) {
+                        throw new SQLException("Customer not found.");
+                    }
+                }
+
+                double pricePerDay;
+                String roomStatus;
+
+                // Check room
+                try (PreparedStatement ps =
+                             con.prepareStatement(roomQuery)) {
+
+                    ps.setInt(1, roomId);
+
+                    ResultSet rs = ps.executeQuery();
+
+                    if (!rs.next()) {
+                        throw new SQLException("Room not found.");
+                    }
+
+                    pricePerDay = rs.getDouble("price_per_day");
+                    roomStatus = rs.getString("status");
+                }
+
+                // Check room availability
+                if (!roomStatus.equalsIgnoreCase("Available")) {
+                    throw new SQLException("Room is not available.");
+                }
+
+                // Calculate number of days
+                long difference =
+                        checkOut.getTime() - checkIn.getTime();
+
+                long days =
+                        difference / (1000 * 60 * 60 * 24);
+
+                if (days <= 0) {
+                    throw new SQLException("Invalid number of days.");
+                }
+
+                double totalAmount =
+                        pricePerDay * days;
+
+                // Insert booking
+                try (PreparedStatement ps =
+                             con.prepareStatement(insertBooking)) {
+
+                    ps.setInt(1, customerId);
+                    ps.setInt(2, roomId);
+                    ps.setDate(3, checkIn);
+                    ps.setDate(4, checkOut);
+                    ps.setDouble(5, totalAmount);
+                    ps.setString(6, "Booked");
+
+                    int rows = ps.executeUpdate();
+
+                    if (rows == 0) {
+                        throw new SQLException("Booking failed.");
+                    }
+                }
+
+                // Update room status
+                try (PreparedStatement ps =
+                             con.prepareStatement(updateRoom)) {
+
+                    ps.setInt(1, roomId);
+
+                    int rows = ps.executeUpdate();
+
+                    if (rows == 0) {
+                        throw new SQLException("Room status update failed.");
+                    }
+                }
+
+                // Everything successful
+                con.commit();
+
+                System.out.println();
+                System.out.println("========================================");
+                System.out.println("       BOOKING SUCCESSFUL");
+                System.out.println("========================================");
+                System.out.println("Customer ID : " + customerId);
+                System.out.println("Room ID     : " + roomId);
+                System.out.println("Check-In    : " + checkIn);
+                System.out.println("Check-Out   : " + checkOut);
+                System.out.println("Days        : " + days);
+                System.out.println("Total Bill  : " + totalAmount);
+                System.out.println("========================================");
+
+            } catch (Exception e) {
+
+                con.rollback();
+
+                System.out.println();
+                System.out.println("Booking failed.");
+                System.out.println("Transaction rolled back.");
+                System.out.println("Reason: " + e.getMessage());
+            }
+
+        } catch (SQLException e) {
+
+            System.out.println("Database error: " + e.getMessage());
+        }
+    }
+
+    // =====================================================
+    // CHECK-IN
+    // =====================================================
+
+    public static void checkIn() {
+
+        System.out.print("Enter booking ID: ");
+        int bookingId = sc.nextInt();
+
+        String sql =
+                "update bookings set status = 'Checked-In' " +
+                "where booking_id = ? and status = 'Booked'";
+
+        try (Connection con =
+                     DriverManager.getConnection(URL, USER, PASSWORD);
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, bookingId);
+
+            int rows = ps.executeUpdate();
+
+            if (rows > 0) {
+
+                System.out.println("Customer checked-in successfully.");
+
+            } else {
+
+                System.out.println(
+                        "Booking not found or customer already checked-in.");
+            }
+
+        } catch (SQLException e) {
+
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+
+    // =====================================================
+    // CHECK-OUT
+    // =====================================================
+
+    public static void checkOut() {
+
+        System.out.print("Enter booking ID: ");
+        int bookingId = sc.nextInt();
+
+        String bookingQuery =
+                "select room_id, status from bookings " +
+                "where booking_id = ?";
+
+        String updateBooking =
+                "update bookings set status = 'Checked-Out' " +
+                "where booking_id = ?";
+
+        String updateRoom =
+                "update rooms set status = 'Available' " +
+                "where room_id = ?";
+
+        try (Connection con =
+                     DriverManager.getConnection(URL, USER, PASSWORD)) {
+
+            con.setAutoCommit(false);
+
+            try {
+
+                int roomId;
+                String status;
+
+                // Get booking details
+                try (PreparedStatement ps =
+                             con.prepareStatement(bookingQuery)) {
+
+                    ps.setInt(1, bookingId);
+
+                    ResultSet rs = ps.executeQuery();
+
+                    if (!rs.next()) {
+                        throw new SQLException("Booking not found.");
+                    }
+
+                    roomId = rs.getInt("room_id");
+                    status = rs.getString("status");
+                }
+
+                if (!status.equalsIgnoreCase("Checked-In")) {
+                    throw new SQLException(
+                            "Customer must be checked-in before check-out.");
+                }
+
+                // Update booking
+                try (PreparedStatement ps =
+                             con.prepareStatement(updateBooking)) {
+
+                    ps.setInt(1, bookingId);
+
+                    ps.executeUpdate();
+                }
+
+                // Make room available
+                try (PreparedStatement ps =
+                             con.prepareStatement(updateRoom)) {
+
+                    ps.setInt(1, roomId);
+
+                    ps.executeUpdate();
+                }
+
+                con.commit();
+
+                System.out.println("Check-out successful.");
+                System.out.println("Room " + roomId + " is now available.");
+
+            } catch (Exception e) {
+
+                con.rollback();
+
+                System.out.println("Check-out failed.");
+                System.out.println("Transaction rolled back.");
+                System.out.println("Reason: " + e.getMessage());
+            }
+
+        } catch (SQLException e) {
+
+            System.out.println("Database error: " + e.getMessage());
+        }
+    }
+
+    // =====================================================
+    // BILLING
+    // =====================================================
+
+    public static void billing() {
+
+        System.out.print("Enter booking ID: ");
+        int bookingId = sc.nextInt();
+
+        String sql =
+                "select b.booking_id, c.customer_name, " +
+                "r.room_id, r.room_type, " +
+                "b.check_in_date, b.check_out_date, " +
+                "b.total_amount, b.status " +
+                "from bookings b " +
+                "join customers c on b.customer_id = c.customer_id " +
+                "join rooms r on b.room_id = r.room_id " +
+                "where b.booking_id = ?";
+
+        try (Connection con =
+                     DriverManager.getConnection(URL, USER, PASSWORD);
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, bookingId);
+
+            ResultSet rs = ps.executeQuery();
+
+            if (rs.next()) {
+
+                System.out.println();
+                System.out.println("========================================");
+                System.out.println("                HOTEL BILL");
+                System.out.println("========================================");
+
+                System.out.println("Booking ID   : "
+                        + rs.getInt("booking_id"));
+
+                System.out.println("Customer     : "
+                        + rs.getString("customer_name"));
+
+                System.out.println("Room ID      : "
+                        + rs.getInt("room_id"));
+
+                System.out.println("Room Type    : "
+                        + rs.getString("room_type"));
+
+                System.out.println("Check-In     : "
+                        + rs.getDate("check_in_date"));
+
+                System.out.println("Check-Out    : "
+                        + rs.getDate("check_out_date"));
+
+                System.out.println("Total Amount : "
+                        + rs.getDouble("total_amount"));
+
+                System.out.println("Status       : "
+                        + rs.getString("status"));
+
+                System.out.println("========================================");
+
+            } else {
+
+                System.out.println("Booking not found.");
+            }
+
+        } catch (SQLException e) {
+
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+}
